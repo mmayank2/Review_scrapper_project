@@ -4,6 +4,9 @@ import requests
 from bs4 import BeautifulSoup as bs
 from urllib.request import urlopen as uReq
 import logging
+import pymongo
+from pymongo.mongo_client import MongoClient
+
 logging.basicConfig(filename="scrapper.log" , level=logging.INFO)
 
 app = Flask(__name__)
@@ -16,7 +19,11 @@ def homepage():
 def index():
     if request.method == 'POST':
         try:
-            searchString = request.form['content'].replace(" ","")
+            search=request.form['content']
+            if search=="":
+                # if search is empty then return to index page
+                return render_template("index.html")
+            searchString = search.replace(" ","")
             flipkart_url = "https://www.flipkart.com/search?q=" + searchString
             uClient = uReq(flipkart_url)
             flipkartPage = uClient.read()
@@ -43,7 +50,7 @@ def index():
                     name = commentbox.div.div.find_all('p', {'class': '_2sc7ZR _2V5EHH'})[0].text
 
                 except:
-                    logging.info("name")
+                    logging.info(name)
 
                 try:
                     #rating.encode(encoding='utf-8')
@@ -52,7 +59,7 @@ def index():
 
                 except:
                     rating = 'No Rating'
-                    logging.info("rating")
+                    logging.info(rating)
 
                 try:
                     #commentHead.encode(encoding='utf-8')
@@ -68,11 +75,42 @@ def index():
                 except Exception as e:
                     logging.info(e)
 
+
+
                 mydict = {"Product": searchString, "Name": name, "Rating": rating, "CommentHead": commentHead,
                           "Comment": custComment}
                 reviews.append(mydict)
             logging.info("log my final result {}".format(reviews))
-            return render_template('result.html', reviews=reviews[0:(len(reviews)-1)])
+            
+            # here we start mongodb work
+          
+            from pymongo.mongo_client import MongoClient
+
+            uri = "mongodb+srv://mayank:pwskills@cluster0.xhdid5l.mongodb.net/?retryWrites=true&w=majority"
+
+# # Create a new client and connect to the server
+            client = MongoClient(uri)
+
+# # Send a ping to confirm a successful connection
+# try:
+#     client.admin.command('ping')
+#     print("Pinged your deployment. You successfully connected to MongoDB!")
+# except Exception as e:
+#     print(e)
+           
+     
+           
+           
+            # creating database
+            db=client['review_scrap']
+            # creating collection
+            review_col=db['review_scrap_data']
+            # insert data in collection
+            review_col.insert_many(reviews)
+
+            # here we completed mogodb work
+
+            return render_template('result.html', reviews=reviews[0:(len(reviews)-1)],searchString=search)
         except Exception as e:
             logging.info(e)
             return 'something is wrong'
